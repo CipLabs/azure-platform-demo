@@ -149,13 +149,10 @@ resource "azurerm_monitor_action_group" "helloworld_alerts" {
   short_name          = "hw-alerts"
   tags                = local.tags
 
-  # Note: Email receiver requires subscription owner approval
-  # For now, alerts are configured without email to avoid approval prompt
-  # To enable email: uncomment and update with your email address
-  # email_receiver {
-  #   name          = "admin-email"
-  #   email_address = "your-email@example.com"
-  # }
+  email_receiver {
+    name          = "admin-email"
+    email_address = "chris.cipriano@outlook.com"
+  }
 }
 
 # Alert: High CPU usage (>80%)
