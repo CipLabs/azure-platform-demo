@@ -227,6 +227,31 @@ Cost:
 
 This is where you show maturity: you're not just deploying code, you're scanning it for known issues. Most demos skip this step.
 
+## Cost Management & Governance
+
+This is where you show financial responsibility. Most demos ignore costs entirely.
+
+**What's here:**
+- Infracost in CI/CD shows cost impact of every Terraform change before it's deployed
+- Cost visibility in PR comments ("This change adds $10/month")
+- Azure budget alerts if spending spikes
+- Resource tags for cost allocation by workload/team
+- Current cost: ~$66/month baseline (2 replicas), up to ~$80/month at peak (5 replicas)
+
+**Why it matters:**
+- Prevents surprise billing from infrastructure changes
+- Makes costs visible to teams (transparency)
+- Enables chargeback if you're cost-allocating across business units
+- Shows FinOps maturity (financial operations)
+
+**Production additions:**
+- Reserved instances for 1-year commitment (20-30% discount)
+- Scheduled scale-down during off-hours
+- Cost anomaly detection alerts
+- Custom dashboards tracking cost per business metric ($/request, $/user)
+
+See docs/COST_MANAGEMENT.md for detailed cost breakdown, Infracost setup, and interview talking points.
+
 ## Next Steps
 
 For the interview:
