@@ -131,3 +131,133 @@ resource "azurerm_container_app" "helloworld_app" {
     }
   }
 }
+
+# Application Insights for distributed tracing and advanced monitoring
+resource "azurerm_application_insights" "helloworld_insights" {
+  name                = "ai-hw-prod-uks-001"
+  location            = data.azurerm_resource_group.helloworld_workload_rg.location
+  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
+  application_type    = "web"
+  retention_in_days   = 90
+  tags                = local.tags
+}
+
+# Action Group for alert notifications
+resource "azurerm_monitor_action_group" "helloworld_alerts" {
+  name                = "ag-hw-prod-uks-001"
+  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
+  short_name          = "hw-alerts"
+  tags                = local.tags
+
+  # Note: Email receiver requires subscription owner approval
+  # For now, alerts are configured without email to avoid approval prompt
+  # To enable email: uncomment and update with your email address
+  # email_receiver {
+  #   name          = "admin-email"
+  #   email_address = "your-email@example.com"
+  # }
+}
+
+# Alert: High CPU usage (>80%)
+resource "azurerm_monitor_metric_alert" "cpu_high" {
+  name                = "alert-cpu-high-hw-prod-uks"
+  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
+  scopes              = [azurerm_container_app.helloworld_app.id]
+  description         = "Alert when Container App CPU usage exceeds 80%"
+  severity            = 2
+  enabled             = true
+  frequency           = "PT1M"
+  window_size         = "PT5M"
+
+  criteria {
+    metric_name      = "CpuUsagePercentage"
+    metric_namespace = "Microsoft.App/containerApps"
+    operator         = "GreaterThan"
+    threshold        = 80
+    aggregation      = "Average"
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.helloworld_alerts.id
+  }
+
+  tags = local.tags
+}
+
+# Alert: High Memory usage (>85%)
+resource "azurerm_monitor_metric_alert" "memory_high" {
+  name                = "alert-memory-high-hw-prod-uks"
+  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
+  scopes              = [azurerm_container_app.helloworld_app.id]
+  description         = "Alert when Container App memory usage exceeds 85%"
+  severity            = 2
+  enabled             = true
+  frequency           = "PT1M"
+  window_size         = "PT5M"
+
+  criteria {
+    metric_name      = "MemoryUsagePercentage"
+    metric_namespace = "Microsoft.App/containerApps"
+    operator         = "GreaterThan"
+    threshold        = 85
+    aggregation      = "Average"
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.helloworld_alerts.id
+  }
+
+  tags = local.tags
+}
+
+# Alert: Container App restarts (>3 in 1 hour)
+resource "azurerm_monitor_metric_alert" "restarts_high" {
+  name                = "alert-restarts-high-hw-prod-uks"
+  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
+  scopes              = [azurerm_container_app.helloworld_app.id]
+  description         = "Alert when Container App restarts exceed 3 in 1 hour (indicates crashes)"
+  severity            = 1
+  enabled             = true
+  frequency           = "PT5M"
+  window_size         = "PT1H"
+
+  criteria {
+    metric_name      = "RestartCount"
+    metric_namespace = "Microsoft.App/containerApps"
+    operator         = "GreaterThan"
+    threshold        = 3
+    aggregation      = "Total"
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.helloworld_alerts.id
+  }
+
+  tags = local.tags
+}
+
+# Alert: Availability (if response rate drops below 99%)
+resource "azurerm_monitor_metric_alert" "availability_low" {
+  name                = "alert-availability-low-hw-prod-uks"
+  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
+  scopes              = [azurerm_application_insights.helloworld_insights.id]
+  description         = "Alert when application availability drops below 99%"
+  severity            = 1
+  enabled             = true
+  frequency           = "PT1M"
+  window_size         = "PT5M"
+
+  criteria {
+    metric_name      = "availabilityResults/availabilityPercentage"
+    metric_namespace = "Microsoft.Insights/components"
+    operator         = "LessThan"
+    threshold        = 99
+    aggregation      = "Average"
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.helloworld_alerts.id
+  }
+
+  tags = local.tags
+}

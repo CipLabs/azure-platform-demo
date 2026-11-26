@@ -50,22 +50,12 @@ terraform.rc
 # Uncomment the line below if you want to ignore planout files.
 # planout
 
-# Documentation (not part of infrastructure codebase)
-README.md
-QUICKSTART.md
-
-# All documentation in docs directory (architecture guides, diagrams, Snyk setup guides)
+# Ignore everything in docs/ except PNG diagrams needed for README
 docs/
+!docs/*.png
 
-# Snyk documentation (guides for setup, can be regenerated)
-docs/SNYK_README.md
-docs/SNYK_CHECKLIST.md
-docs/SNYK_SETUP.md
-docs/SNYK_SETUP_WALKTHROUGH.md
-
-# Cost management documentation (guides and setup, can be regenerated)
-docs/COST_MANAGEMENT.md
-docs/COST_SETUP.md
+# Track README (required for assignment)
+!README.md
 
 # Interview and planning documentation (local only)
 AUTOSCALING_GUIDE.md
