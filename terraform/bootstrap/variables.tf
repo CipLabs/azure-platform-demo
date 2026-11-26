@@ -19,6 +19,16 @@ variable "github_repository" {
   }
 }
 
+variable "github_organization_id" {
+  description = "GitHub organization/user numeric ID (from OIDC error subject claim)"
+  type        = string
+}
+
+variable "github_repository_id" {
+  description = "GitHub repository numeric ID (from OIDC error subject claim)"
+  type        = string
+}
+
 variable "github_environment" {
   description = "Protected GitHub environment allowed to deploy to Azure."
   type        = string
