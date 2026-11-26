@@ -50,13 +50,6 @@ terraform.rc
 # Uncomment the line below if you want to ignore planout files.
 # planout
 
-# Ignore everything in docs/ except PNG diagrams needed for README
-docs/
-!docs/*.png
-
-# Track README (required for assignment)
-!README.md
-
 # Interview and planning documentation (local only)
 AUTOSCALING_GUIDE.md
 DEPLOYMENT.md
@@ -67,3 +60,4 @@ INTERVIEW-QUICK-REF.md
 INTERVIEW-READY.md
 FQDN-FIX.md
 STATUS.md
+
