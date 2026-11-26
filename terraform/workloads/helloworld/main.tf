@@ -167,7 +167,7 @@ resource "azurerm_monitor_metric_alert" "cpu_high" {
   window_size         = "PT5M"
 
   criteria {
-    metric_name      = "CpuUsagePercentage"
+    metric_name      = "Cpu"
     metric_namespace = "Microsoft.App/containerApps"
     operator         = "GreaterThan"
     threshold        = 80
@@ -193,7 +193,7 @@ resource "azurerm_monitor_metric_alert" "memory_high" {
   window_size         = "PT5M"
 
   criteria {
-    metric_name      = "MemoryUsagePercentage"
+    metric_name      = "Memory"
     metric_namespace = "Microsoft.App/containerApps"
     operator         = "GreaterThan"
     threshold        = 85

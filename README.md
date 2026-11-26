@@ -50,10 +50,30 @@ Infrastructure changes should show their cost impact before they're deployed. If
 ### Why Snyk for Image Scanning?
 Container images inherit vulnerabilities from base images and dependencies. Snyk scans every image we build and blocks deployment if critical CVEs are found. It's free and prevents shipping known-vulnerable code.
 
+### Application Design: Wrapping a From-Scratch Binary in HTTP
+
+The assignment required deploying `library/hello-world`—a minimal from-scratch image with just a static binary (`/hello`) and no shell or runtime.
+
+**Problem:** A from-scratch binary isn't accessible over HTTP. It needs a listening port and HTTP handler.
+
+**Solution:** We built a Python HTTP wrapper that:
+1. Runs a Python 3.12-slim base (small, production-grade)
+2. Extracts the official `/hello` binary via multi-stage Docker build
+3. Wraps it in a minimal HTTP server that serves:
+   - `GET /` → Runs `/hello` and returns its output over HTTP
+   - `GET /healthz` → Health probe for Container App liveness checks
+
+**Why this approach?**
+- **Uses the exact official image** (satisfies the assignment requirement)
+- **Minimal attack surface** (`/hello` is static and from an official source)
+- **No runtime overhead** (subprocess call to a binary is negligible)
+- **Production-safe headers** (CSP, nosniff, referrer policy on every response)
+
+The Dockerfile uses a multi-stage build to keep the final image small—only the extracted binary and Python interpreter, nothing else.
+
 ### Why This Specific Setup Is Not Production-Ready
 - **No network isolation**: The app is publicly accessible. For regulated data, you'd need a VNet with private subnets.
 - **No WAF**: Azure Front Door with WAF (~$500/month) would add DDoS protection and rate limiting. For a public demo with no data, it's overkill.
-- **No IP restrictions**: Anyone can hit the endpoint. For internal apps, you'd lock it down.
 - **ACR is public**: For production, you'd use private endpoints so images never touch the public internet.
 
 This is intentional. The demo shows the *patterns* (managed identity, automation, cost tracking) without over-engineering for a workload that handles no sensitive data.
@@ -371,23 +391,3 @@ To make changes:
 5. Review the PR, merge to main
 6. CD automatically deploys
 
-## Repository Structure
-
-```
-terraform/
-  bootstrap/              Day-0 infrastructure setup
-  modules/
-    private-endpoint/    Reusable private endpoint module
-  workloads/
-    helloworld/         Application deployment
-app/                    Hello World container
-.github/workflows/      CI/CD pipelines
-docs/
-  architecture-current-demo.png   Demo architecture diagram
-  architecture-production.png      Production architecture diagram (future reference)
-README.md               Complete guide (run, design, monitoring, roadmap)
-```
-
----
-
-This deployment was built as a platform engineering exercise, showcasing infrastructure-as-code, automation, cost governance, and security-first practices. It's not production-ready for sensitive workloads, but it shows the patterns and thinking that would apply to production systems.
