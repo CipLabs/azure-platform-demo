@@ -9,13 +9,23 @@ variable "location" {
   default     = "uksouth"
 }
 
-variable "github_repository" {
-  description = "GitHub repository in owner/name format."
+variable "github_repository_owner" {
+  description = "GitHub repository owner (username or organization name)."
   type        = string
 
   validation {
-    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
-    error_message = "github_repository must be in owner/name format."
+    condition     = can(regex("^[A-Za-z0-9_.-]+$", var.github_repository_owner))
+    error_message = "github_repository_owner must be a valid GitHub username or organization name."
+  }
+}
+
+variable "github_repository_name" {
+  description = "GitHub repository name."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+$", var.github_repository_name))
+    error_message = "github_repository_name must be a valid GitHub repository name."
   }
 }
 

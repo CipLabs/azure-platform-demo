@@ -45,7 +45,7 @@ resource "azurerm_federated_identity_credential" "github_production_deployment_f
   parent_id           = azurerm_user_assigned_identity.github_actions_deployer_uaidentity.id
   audience            = ["api://AzureADTokenExchange"]
   issuer              = "https://token.actions.githubusercontent.com"
-  subject             = "repo:${var.github_repository}@${var.github_repository_id}:environment:${var.github_environment}"
+  subject             = "repo:${var.github_repository_owner}@${var.github_organization_id}/${var.github_repository_name}@${var.github_repository_id}:environment:${var.github_environment}"
 }
 
 resource "azurerm_role_assignment" "github_deployer_workload_contributor" {

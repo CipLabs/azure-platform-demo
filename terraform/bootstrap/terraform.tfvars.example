@@ -3,12 +3,18 @@
 
 subscription_id = "YOUR_AZURE_SUBSCRIPTION_UUID"
 
-# GitHub repository in owner/repo format
-github_repository = "YOUR_GITHUB_OWNER/YOUR_REPOSITORY_NAME"
+# GitHub repository owner (username or organization name)
+github_repository_owner = "YOUR_GITHUB_OWNER"
 
-# GitHub organization numeric ID (get via: gh api orgs/{org} --jq .id)
+# GitHub repository name
+github_repository_name = "YOUR_REPOSITORY_NAME"
+
+# GitHub organization/user numeric ID (get from OIDC error: repo:owner@{org_id}/...)
 # For personal accounts, get your user ID via: gh api user --jq .id
 github_organization_id = "YOUR_GITHUB_ORG_OR_USER_ID"
+
+# GitHub repository numeric ID (get from OIDC error: repo:.../repo@{repo_id}:...)
+github_repository_id = "YOUR_GITHUB_REPOSITORY_ID"
 
 # Azure region where bootstrap resources will be created
 location = "uksouth"
