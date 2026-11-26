@@ -1,0 +1,13 @@
+# Copy this file to terraform.tfvars and fill in your Azure subscription and GitHub repository.
+# DO NOT commit terraform.tfvars to Git—it will contain your subscription ID.
+
+subscription_id = "YOUR_AZURE_SUBSCRIPTION_UUID"
+
+# GitHub repository in owner/repo format
+github_repository = "YOUR_GITHUB_OWNER/YOUR_REPOSITORY_NAME"
+
+# Azure region where bootstrap resources will be created
+location = "uksouth"
+
+# Protected GitHub environment name (must exist in your repository)
+github_environment = "production"
