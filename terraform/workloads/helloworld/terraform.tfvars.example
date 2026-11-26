@@ -1,0 +1,20 @@
+# Copy this file to terraform.tfvars and fill in your Azure subscription and ACR registry name.
+# DO NOT commit terraform.tfvars to Git—it will contain your subscription ID.
+# The container_registry_name should match the ACR name output from bootstrap (e.g., acrhelloworldabc).
+
+subscription_id = "YOUR_AZURE_SUBSCRIPTION_UUID"
+
+# Azure Container Registry name created by bootstrap
+container_registry_name = "acrhelloworldXYZ"
+
+# Azure region (must match bootstrap location)
+location = "uksouth"
+
+# Workload resource group name
+resource_group_name = "rg-helloworld-prod-uks-001"
+
+# User-assigned identity for the Container App to pull images
+runtime_identity_name = "id-helloworldapp-prod-uks-001"
+
+# Immutable container image tag (use git commit SHA in CI/CD)
+image_tag = "v1.0.0"

@@ -1,0 +1,10 @@
+# Backend configuration for Terraform state storage.
+# This file is not committed to Git. Copy backend.conf.example to backend.conf
+# and fill in the values from bootstrap output before running terraform init locally.
+
+resource_group_name  = "rg-tfstate-prod-uks-001"
+storage_account_name = "sttfstateproduksvXYZ"
+container_name       = "tfstate"
+key                  = "helloworld-prod.tfstate"
+use_azuread_auth     = true
+use_oidc             = true
