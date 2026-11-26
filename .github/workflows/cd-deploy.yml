@@ -105,6 +105,25 @@ jobs:
             --format json \
             --out-file infracost.json
 
+      - name: Display Infracost cost estimate in logs
+        run: |
+          infracost breakdown --path terraform/workloads/helloworld/tfplan \
+            --format table
+
+      - name: Add Infracost to GitHub Actions summary
+        run: |
+          echo "## Infrastructure Cost (Before Apply)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          infracost breakdown --path terraform/workloads/helloworld/tfplan \
+            --format markdown >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Infracost report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: infracost-report-${{ github.sha }}
+          path: infracost.json
+          retention-days: 30
+
       - name: Upload terraform plan
         uses: actions/upload-artifact@v4
         with:
