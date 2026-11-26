@@ -108,13 +108,13 @@ resource "azurerm_container_app" "helloworld_app" {
     }
 
     cpu_scale_rule {
-      name       = "cpu-utilization"
-      threshold  = 70
+      name      = "cpu-utilization"
+      threshold = 70
     }
 
     memory_scale_rule {
-      name       = "memory-utilization"
-      threshold  = 80
+      name      = "memory-utilization"
+      threshold = 80
     }
 
     container {
