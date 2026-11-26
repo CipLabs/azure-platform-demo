@@ -142,19 +142,29 @@ Why managed identity for the app?
 ## Scaling Considerations
 
 Current demo (2-5 replicas):
-- Handles normal traffic spikes
-- Auto-scales based on CPU, memory, HTTP requests
+- Autoscales based on HTTP concurrent requests (100 requests per replica)
+- Min 2 replicas for high availability, max 5 for cost control
+- When concurrent requests exceed 100 per replica, a new replica is added
+- When traffic drops, replicas scale down (but never below 2)
 - Max cost per month: ~$40 for Container Apps
+
+How scaling works:
+- Scale rule: "If concurrent HTTP requests > 100 per replica, add another replica"
+- Example: 250 concurrent requests = 3 replicas (250 ÷ 100 ≈ 2.5, rounds up)
+- Scaling decisions happen every 30-60 seconds (automatic)
+- No manual intervention needed
 
 Scaling to production (10-20+ replicas):
 - Add Front Door cache (reduces backend load)
 - Add multi-region if needed (HA across geographies)
 - Monitor actual traffic patterns first
+- Could adjust concurrent_requests threshold based on observed load
 
 Scaling further (100+ replicas):
 - Consider Kubernetes (more efficient at scale)
 - API Management for rate limiting and versioning
 - Dedicated security infrastructure
+- Multiple Container App environments for horizontal scaling
 
 ## Observability
 
