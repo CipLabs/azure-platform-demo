@@ -1,7 +1,7 @@
 locals {
-  container_app_environment_name = "cae-helloworld-prod-uks-001"
-  container_app_name             = "ca-helloworld-prod-uks-001"
-  log_analytics_workspace_name   = "log-helloworld-prod-uks-001"
+  container_app_environment_name = "cae-hw-prod-uks-001"
+  container_app_name             = "ca-hw-prod-uks-001"
+  log_analytics_workspace_name   = "log-hw-prod-uks-001"
 
   tags = {
     environment = "prod"
