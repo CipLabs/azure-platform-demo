@@ -107,6 +107,16 @@ resource "azurerm_container_app" "helloworld_app" {
       concurrent_requests = "100"
     }
 
+    cpu_scale_rule {
+      name       = "cpu-utilization"
+      threshold  = 70
+    }
+
+    memory_scale_rule {
+      name       = "memory-utilization"
+      threshold  = 80
+    }
+
     container {
       name   = "helloworld"
       image  = "${data.azurerm_container_registry.helloworld_acr.login_server}/helloworld:${var.image_tag}"

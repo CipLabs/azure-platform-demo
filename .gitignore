@@ -63,3 +63,9 @@ INTERVIEW-QUICK-REF.md
 INTERVIEW-READY.md
 FQDN-FIX.md
 STATUS.md
+
+# Snyk documentation (guides for setup, can be regenerated)
+docs/SNYK_README.md
+docs/SNYK_CHECKLIST.md
+docs/SNYK_SETUP.md
+docs/SNYK_SETUP_WALKTHROUGH.md

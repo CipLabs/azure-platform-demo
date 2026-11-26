@@ -55,6 +55,14 @@ jobs:
         env:
           ACR_NAME: ${{ vars.ACR_NAME }}
 
+      - name: Scan image for vulnerabilities
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ vars.ACR_NAME }}.azurecr.io/helloworld:${{ github.sha }}
+          args: --fail-on=critical
+
       - name: Initialize remote backend
         run: |
           terraform -chdir=terraform/workloads/helloworld init \
