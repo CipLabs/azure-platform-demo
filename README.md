@@ -248,11 +248,11 @@ az monitor log-analytics query \
   --analytics-query "ContainerAppConsoleLogs_CL | summarize Count = count() by bin(TimeGenerated, 1h)"
 ```
 
-**Metrics & Alerts** - CPU, Memory, Restart Count (auto-collected by Azure Monitor). Automated alerts fire when:
-- **CPU usage > 80%** (severity 2, warning): Container may need optimization or higher resource allocation
-- **Memory usage > 85%** (severity 2, warning): Potential memory leak or insufficient allocation
+**Metrics & Alerts** - Automated alerts monitor application health:
 - **Restart count > 3 in 1 hour** (severity 1, critical): Indicates container crashes; requires investigation
-- **Availability < 99%** (severity 1, critical): Application response rate degradation; immediate action needed
+- **Availability < 99%** (severity 1, critical): Application response rate degradation via Application Insights; immediate action needed
+
+Container Apps exposes raw metrics like `UsageNanoCores` and `WorkingSetBytes`, but percentage-based CPU/Memory alerts require knowledge of resource limits. For production, use Application Insights metrics (which we have) combined with autoscaling rules (already configured to scale on request load).
 
 Scaling is driven by HTTP concurrent request load (100 requests/replica = scale threshold):
 ```bash

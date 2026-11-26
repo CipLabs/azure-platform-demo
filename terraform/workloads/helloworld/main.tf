@@ -155,59 +155,7 @@ resource "azurerm_monitor_action_group" "helloworld_alerts" {
   }
 }
 
-# Alert: High CPU usage (>80%)
-resource "azurerm_monitor_metric_alert" "cpu_high" {
-  name                = "alert-cpu-high-hw-prod-uks"
-  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
-  scopes              = [azurerm_container_app.helloworld_app.id]
-  description         = "Alert when Container App CPU usage exceeds 80%"
-  severity            = 2
-  enabled             = true
-  frequency           = "PT1M"
-  window_size         = "PT5M"
-
-  criteria {
-    metric_name      = "Cpu"
-    metric_namespace = "Microsoft.App/containerApps"
-    operator         = "GreaterThan"
-    threshold        = 80
-    aggregation      = "Average"
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.helloworld_alerts.id
-  }
-
-  tags = local.tags
-}
-
-# Alert: High Memory usage (>85%)
-resource "azurerm_monitor_metric_alert" "memory_high" {
-  name                = "alert-memory-high-hw-prod-uks"
-  resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
-  scopes              = [azurerm_container_app.helloworld_app.id]
-  description         = "Alert when Container App memory usage exceeds 85%"
-  severity            = 2
-  enabled             = true
-  frequency           = "PT1M"
-  window_size         = "PT5M"
-
-  criteria {
-    metric_name      = "Memory"
-    metric_namespace = "Microsoft.App/containerApps"
-    operator         = "GreaterThan"
-    threshold        = 85
-    aggregation      = "Average"
-  }
-
-  action {
-    action_group_id = azurerm_monitor_action_group.helloworld_alerts.id
-  }
-
-  tags = local.tags
-}
-
-# Alert: Container App restarts (>3 in 1 hour)
+# Alert: High restart count (>3 in 1 hour) - indicates container crashes
 resource "azurerm_monitor_metric_alert" "restarts_high" {
   name                = "alert-restarts-high-hw-prod-uks"
   resource_group_name = data.azurerm_resource_group.helloworld_workload_rg.name
