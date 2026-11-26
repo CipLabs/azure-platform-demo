@@ -47,8 +47,11 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build image in Azure Container Registry
-        run: az acr build --registry "$ACR_NAME" --image "helloworld:${GITHUB_SHA}" app
+      - name: Build and push image to Azure Container Registry
+        run: |
+          az acr login --name "$ACR_NAME"
+          docker build --tag "$ACR_NAME.azurecr.io/helloworld:${{ github.sha }}" app
+          docker push "$ACR_NAME.azurecr.io/helloworld:${{ github.sha }}"
         env:
           ACR_NAME: ${{ vars.ACR_NAME }}
 

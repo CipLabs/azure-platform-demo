@@ -21,7 +21,7 @@ resource "azurerm_container_registry" "helloworld_acr" {
   admin_enabled                 = false
   anonymous_pull_enabled        = false
   public_network_access_enabled = true
-  role_assignment_mode          = "AbacRepositoryPermissions"
+  role_assignment_mode          = "LegacyRegistryPermissions"
   tags                          = local.tags
 }
 
@@ -62,9 +62,9 @@ resource "azurerm_role_assignment" "github_deployer_tfstate_blob_data_contributo
   principal_type       = "ServicePrincipal"
 }
 
-resource "azurerm_role_assignment" "github_deployer_acr_contributor" {
+resource "azurerm_role_assignment" "github_deployer_acr_push" {
   scope                = azurerm_container_registry.helloworld_acr.id
-  role_definition_name = "Container Registry Contributor and Data Access Configuration Administrator"
+  role_definition_name = "AcrPush"
   principal_id         = azurerm_user_assigned_identity.github_actions_deployer_uaidentity.principal_id
   principal_type       = "ServicePrincipal"
 }
