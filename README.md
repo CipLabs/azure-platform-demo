@@ -14,25 +14,12 @@ A public-facing HTTP service (`/healthz` for liveness, `/` returns a simple resp
 
 ## High-Level Architecture
 
-```
-Internet Users
-    │ HTTPS
-    ↓
-Public Container App (2-5 replicas, autoscaling)
-    ├─→ Container Registry (pulls images)
-    ├─→ Log Analytics (logs, 30-day retention)
-    ├─→ Application Insights (traces, exceptions, APM)
-    ├─→ Monitor Action Group (alerts → email)
-    └─→ Managed Identity (Azure AD auth)
-        
-GitHub Actions CI/CD
-    ├─→ Validate (format, syntax, security)
-    ├─→ Build & Push Image
-    ├─→ Scan Image (Snyk)
-    └─→ Plan & Cost Estimate (Infracost)
-        └─→ Approval Gate
-            └─→ Deploy to App via Terraform
-```
+**Demo Deployment:**
+![Demo Architecture](docs/architecture-current-demo.png)
+
+**Production Deployment:**
+![Production Architecture](docs/architecture-production.png)
+
 ## Design Decisions
 
 ### Why Container Apps Instead of Kubernetes?
@@ -524,7 +511,6 @@ curl https://$FQDN/
 ```bash
 az containerapp show --name ca-hw-prod-uks-001 --resource-group rg-helloworld-prod-uks-001 --query "properties.template.scale"
 ```
-
 ## Contributing
 
 This is a demo/learning project. The main branch is protected—changes go through PR, CI validation, and cost review.
