@@ -64,9 +64,10 @@ Storing keys in GitHub (even encrypted) is a liability. Managed identity means A
 
 ### Why Split Resource Groups?
 - `rg-tfstate-prod-uks-001`: Terraform state storage (long lifecycle, rarely changes)
+- `rg-platform-cicd-prod-uks-001`: CI/CD infrastructure (managed identity, ACR, Log Analytics)
 - `rg-helloworld-prod-uks-001`: Application and runtime resources (updated frequently)
 
-This separation reduces blast radius—if something goes wrong with the app, it doesn't touch the state storage. Different teams could own these independently.
+This separation reduces blast radius—if something goes wrong with the app, it doesn't touch the state storage or CI/CD infrastructure. Different teams could own these independently.
 
 ### Why Infracost in CI/CD?
 Infrastructure changes should show their cost impact before they're deployed. If someone accidentally changes `max_replicas` from 5 to 20, Infracost posts "$54/month cost increase" in the PR. Catch expensive mistakes early.
@@ -74,18 +75,80 @@ Infrastructure changes should show their cost impact before they're deployed. If
 ### Why Snyk for Image Scanning?
 Container images inherit vulnerabilities from base images and dependencies. Snyk scans every image we build and blocks deployment if critical CVEs are found. It prevents shipping known-vulnerable code.
 
-### Why This Specific Setup Is Not Production-Ready
-- **No network isolation**: The app is publicly accessible. For regulated data, you'd need a VNet with private subnets.
-- **No WAF**: Azure Front Door with WAF (~$500/month) would add DDoS protection and rate limiting. For a public demo with no data, it's overkill.
-- **ACR is public**: For production, you'd use private endpoints so images never touch the public internet.
-
-This is intentional. The demo shows the *patterns* (managed identity, automation, cost tracking) without over-engineering for a workload that handles no sensitive data.
-
 ## Terraform Structure: Bootstrap vs. Workload
 
 We split Terraform into two layers: **bootstrap** and **workload**. Bootstrap creates the foundation (Terraform state storage, container registry, managed identities, CI/CD auth) that everything else depends on. Workload deploys the application on top of that foundation. This separation means bootstrap runs once and rarely changes, while workload can be deployed and updated frequently without touching shared infrastructure. It also reflects reality: on Day 0, you have no state storage yet, so you must store bootstrap state locally, migrate it to remote storage, then deploy workloads with remote state. This reduces the blast radius and separates concerns.
 
-## How to Run It
+## Demo Deployment vs. Production Hardening
+
+### Demo (This Repository)
+
+**What we're building:**
+- Stateless HTTP service on Azure Container Apps
+- Public ingress (no network isolation)
+- ACR Basic tier (public, no geo-replication)
+- Single region (UK South) with optional zone redundancy
+- Application Insights & Log Analytics with 90/30-day retention
+- Managed identity auth (no stored secrets)
+- Snyk image scanning in CI/CD
+- Infracost cost estimates in every PR
+
+**Why this is not production-ready:**
+- **No network isolation**: The app is publicly accessible. For regulated data, you'd need a VNet with private subnets and private endpoints.
+- **No WAF**: Azure Front Door Premium with WAF (~$330/month base) would add DDoS protection and rate limiting. For a public demo with no data, it's overkill.
+- **ACR is public**: For production, you'd use private endpoints so images never touch the public internet.
+- **Single region**: Regional Azure outage = full downtime. Production requires multi-region DR.
+- **No encryption at rest**: Terraform state uses default encryption. Production should use CMK (customer-managed keys).
+
+**Cost:** ~$34/month (or ~$55/month at peak load with 5 replicas)
+
+This is intentional. The demo shows the *patterns* (managed identity, automation, cost tracking, security scanning) without over-engineering for a workload that handles no sensitive data.
+
+### Production Hardening (If Handling Customer Data)
+
+**Network Security:**
+- VNet with private subnets (`10.0.0.0/16` with `/24` delegated to Container Apps)
+- Private endpoints for ACR and Storage Account (no public IP exposure)
+- Private DNS zones (`privatelink.azurecr.io`, `privatelink.blob.core.windows.net`)
+- Network Security Groups (NSGs) restricting lateral movement
+- Azure Firewall or WAF at the perimeter
+
+**High Availability & Disaster Recovery:**
+- **Zone redundancy**: Container App Environment across 3 AZs (`zone_redundancy_enabled = true`)
+- **Multi-region**: Active-Active or Active-Passive DR via Azure Front Door Premium
+- **Geo-redundant storage**: GRS or RA-GRS for Terraform state (automatic failover to paired region)
+- **ACR Premium**: Geo-replication to secondary region (e.g., UK South + West Europe)
+- **Health checks & monitoring**: Azure Monitor alerts on unhealthy instances
+
+**Secrets & Identity:**
+- Azure Key Vault for runtime secrets (API keys, DB passwords, etc.)
+- Managed Identity with least-privilege roles (Contributor only where necessary)
+- No keys in GitHub; OIDC federated auth for CI/CD
+
+**Data Protection:**
+- Encryption at rest: Customer-managed keys (CMK) for state and logs
+- Encryption in transit: TLS 1.2+ everywhere
+- Blob versioning & soft delete (7-day retention) on Storage Account
+- Application Insights & Log Analytics exports to separate storage for long-term audit trail
+
+**Compliance & Scanning:**
+- Container Registry content trust (cryptographic signing of images)
+- Policy enforcement (Azure Policy) for resource naming, tagging, compliance
+- Audit logging (Azure Monitor Activity Log)
+- Regular vulnerability scanning (Snyk in CI/CD + runtime scanning)
+- SOC 2 / HIPAA / PCI-DSS compliance as needed
+
+**Self-Hosted CI/CD:**
+- If ACR is private and sensitive workloads require network isolation, deploy self-hosted GitHub Actions runners as Azure Container Apps (using KEDA for ephemeral scaling). This keeps the CI/CD pipeline inside the VNet, preventing images from traversing the public internet.
+- Runner authenticates to private ACR via managed identity and push/pull images privately.
+
+**Cost:** ~$150–$250/month (depending on DR strategy: ~$34 base + ~$110 for Active-Active, or ~$20 for Active-Passive)
+
+---
+
+The difference: **Demo** prioritizes simplicity and cost. **Production** prioritizes security, compliance, and resilience. Both use the same Terraform patterns—production just enables more features and isolation.
+
+## How to Run the Demo deployment
 
 ### Prerequisites
 - Azure CLI (latest)
@@ -242,7 +305,7 @@ open "https://github.com/CipLabs/azure-platform-demo/actions"
 ```bash
 # Get the Container App URL
 FQDN=$(az containerapp show \
-  --name ca-helloworld-prod-uks-001 \
+  --name ca-hw-prod-uks-001 \
   --resource-group rg-helloworld-prod-uks-001 \
   --query 'properties.configuration.ingress.fqdn' -o tsv)
 
@@ -315,13 +378,13 @@ az containerapp show \
   --query "properties.template.scale"
 ```
 
-**Receiving Alerts** - Alerts are configured to send email notifications to `chris.cipriano@outlook.com`. When the monitoring conditions are triggered, you'll receive alerts for:
+**Receiving Alerts** - Alerts are configured to send email notifications to `<ALERT_EMAIL>` (configure via the `alert_email` Terraform variable). When the monitoring conditions are triggered, you'll receive alerts for:
 - **Container App restarts** (> 3 in 1 hour)
 - **Application availability drops** (< 99%)
 
 The alerts are managed via Azure Monitor Action Group (`ag-hw-prod-uks-001`) and routed through the configured email receiver. The designated admin should have already received an email subscription confirmation from Azure Monitor; if not, have them check their spam folder or verify the email address in `terraform/workloads/helloworld/main.tf`.
 
-To modify the alert email address, update `email_address` in the action group configuration and re-apply Terraform.
+To modify the alert email address, update the `alert_email` variable and re-apply Terraform.
 
 **Costs** - Tracked pre-deployment via Infracost (cost impact in PR comments) and actual spending via Azure Cost Management:
 ```bash
@@ -335,193 +398,132 @@ az costmanagement query \
 
 **Production would add** - Custom dashboards, automated remediation (e.g., scale down and restart on repeated errors), and integration with incident management (PagerDuty, Opsgenie).
 
-## Troubleshooting
+## Redundancy & Disaster Recovery
 
-### Application Not Responding
+### Demo (Current State)
+**High Availability:**
+- Container App: 2-5 replicas with autoscaling (across a single availability zone in UK South)
+- Terraform state: ZRS (Zone-Redundant Storage) — survives single datacenter failure in UK South
+- Application Insights & Log Analytics: Replicated automatically by Azure (no manual setup)
 
-**Symptom:** `curl https://$FQDN/` times out or returns 5xx errors
+**Limitations:**
+- **Not zone-redundant**: Container App Environment doesn't have `zone_redundancy_enabled = true`. Failure in the single AZ = downtime
+- **Single region** (UK South) — regional outage = full downtime
+- ACR Basic tier: No geo-replication
+- No automated backups for application code/images
+- **RTO/RPO**: Would require manual redeploy from GitHub to another region (~30 mins)
 
-**Investigation steps:**
-1. Check if container is running and healthy:
-   ```bash
-   az containerapp show \
-     --name ca-helloworld-prod-uks-001 \
-     --resource-group rg-helloworld-prod-uks-001 \
-     --query "properties.runningStatus"
-   ```
+**Recovery Steps If UK South Goes Down:**
+1. `terraform init` pointing to same Storage Account (recovers state from ZRS replicas)
+2. Modify region to another Azure region (e.g., `uks` → `weu`)
+3. `terraform apply` to redeploy
+4. Update DNS/Front Door to point to new region
 
-2. Check container logs for errors:
-   ```bash
-   az containerapp logs show \
-     --name ca-helloworld-prod-uks-001 \
-     --resource-group rg-helloworld-prod-uks-001 \
-     --tail 100
-   ```
+### Production (Hardened Deployment)
+**High Availability:**
+- Container App: 2-5 replicas, **zone-redundant** across 3 AZs in primary region
+- Terraform state: GRS or RA-GRS (Geo-Redundant Storage) — automatic failover to paired region
+- ACR Premium: Geo-replication to secondary region (e.g., UK South + West Europe)
+- Application Insights & Log Analytics: Replicate exports to Storage Account
 
-3. Check if container is restarting repeatedly (crash loop):
-   ```bash
-   az containerapp revision list \
-     --name ca-helloworld-prod-uks-001 \
-     --resource-group rg-helloworld-prod-uks-001 \
-     --output table
-   ```
-   Look for high restart counts in `Replicas` column.
+**Disaster Recovery Strategy:**
+Container Apps doesn't support native geo-replication, so DR requires **multi-region deployment**:
 
-4. Check Application Insights for detailed traces:
-   ```bash
-   # In Azure Portal: Application Insights → Failures
-   # Look for exceptions or failed requests
-   ```
+1. **Active-Active (High Cost, Zero Manual Intervention)**:
+   - Identical Container App in secondary region, `zone_redundancy_enabled = true`
+   - Azure Front Door Premium continuously routes traffic to both regions
+   - ACR geo-replicated
+   - Both regions serving traffic simultaneously
+   - **On disaster**: Front Door health checks detect failure, automatically routes all traffic to healthy region
+   - **NO manual intervention required** (fully automatic failover)
+   - **RTO**: <5 seconds (Front Door health check and reroute)
+   - **RPO**: <1 minute
+   - **Cost**: ~$110/month additional (full duplicate infrastructure + Front Door)
 
-### High CPU/Memory Usage
+2. **Active-Passive (Budget-Conscious, Manual Scale-Up)**:
+   - Primary region: Running normally, zone-redundant
+   - Secondary region: Infrastructure in Terraform, `min_replicas = 0` (costs nothing while idle)
+   - On disaster: Operator runs `terraform apply` to secondary with `min_replicas = 2` to scale up
+   - Front Door health checks detect failure, routes to secondary
+   - **RTO**: 5-10 minutes (manual scale-up time)
+   - **RPO**: 1-2 minutes
+   - **Cost**: ~$20/month (standby infrastructure only)
 
-**Symptom:** Application is slow or timing out under load
+3. **No Multi-Region DR (Cost-Optimized, Longest Recovery)**:
+   - Zone redundancy within single region (protects against AZ failure)
+   - Regional outage = manual redeploy to new region (~30 min)
+   - **RTO**: 30 minutes
+   - **RPO**: 15 minutes (from last commit in GitHub)
+   - **Cost**: ~$11/month (zone redundancy surcharge only)
 
-**Investigation steps:**
-1. Check current replica count and scaling status:
-   ```bash
-   az containerapp show \
-     --name ca-helloworld-prod-uks-001 \
-     --resource-group rg-helloworld-prod-uks-001 \
-     --query "properties.template.scale"
-   ```
+### Backup & Recovery Procedures
 
-2. Check if we're at max replicas (5):
-   - If yes, the app is under sustained high load
-   - Consider increasing `max_replicas` in Terraform
-
-3. Check actual resource usage in Application Insights:
-   ```bash
-   # Portal: Application Insights → Performance
-   ```
-
-### Unexpected Cost Spike
-
-**Symptom:** Infracost in PR shows unexpected cost increase
-
-**Investigation steps:**
-1. Check the Infracost output in the PR comment
-2. Look for resource count changes (e.g., `max_replicas` increased accidentally)
-3. Review the terraform plan diff
-4. If correct, approve. If not, close the PR and fix the code.
-
-**Actual cost spiking after deployment:**
+**Application Code & Images:**
 ```bash
-# Check daily spend
-az costmanagement query \
-  --scope "/subscriptions/$(az account show --query id -o tsv)" \
-  --timeframe "MonthToDate" \
-  --granularity "Daily" \
-  --metrics "ActualCost"
+# ACR geo-replication setup (production)
+az acr replication create \
+  --registry $ACR_NAME \
+  --location westeurope
+
+# Check replicas
+az acr replication list --registry $ACR_NAME --output table
 ```
 
-Likely causes:
-- Container App scaled to max replicas (high request load)
-- Application Insights data ingestion spike
-- Storage account usage surge
+**Monitoring & Alerting:**
+All Container App instances in both regions are monitored via Azure Monitor. Availability metrics and health probes alert operations immediately if either region becomes unhealthy. Front Door health checks (every 10 seconds) ensure traffic is routed only to healthy instances.
 
-### Terraform Apply Failed
+**Active-Passive Failover Task:**
+If using active-passive DR, the failover procedure is:
+```bash
+# When primary region fails, manually scale secondary region:
+az containerapp update \
+  --name ca-hw-prod-uks-001 \
+  --resource-group rg-helloworld-prod-uks-001 \
+  --min-replicas 2  # Scale from 0 to active
+```
 
-**Symptom:** GitHub Actions deploy step fails with Terraform error
+## Troubleshooting
 
-**Common causes & fixes:**
+**Container app not responding:** Check logs via `az containerapp logs show`, verify replica count is > 0, review Application Insights for exceptions.
 
-1. **Backend state lock timeout**
-   - Another deployment is in progress
-   - Wait for it to complete or manually unlock: `terraform force-unlock <LOCK_ID>`
+**High CPU/Memory under load:** Check if at max replicas (5) via `properties.template.scale`. If yes, increase `max_replicas` in Terraform.
 
-2. **Insufficient permissions**
-   - Verify OIDC federated credential is configured correctly
-   - Check that managed identity has required roles (Contributor on subscription)
+**Unexpected cost spike:** Verify resource changes in `terraform plan` output (e.g., `max_replicas` increased), review Infracost cost estimates in PR comments.
 
-3. **Azure resource limits**
-   - Container Apps quota exceeded
-   - Contact Azure support to increase quota
-
-4. **Metric alert metric names invalid**
-   - Verify metric names exist in Azure Monitor for the resource type
-   - Use `az monitor metrics list-definitions --resource <RESOURCE_ID>` to check available metrics
+**Terraform apply failed:** Most common causes are backend state lock timeout, insufficient OIDC federated credential permissions, or Azure resource quota limits. Check `terraform plan` output for detailed error.
 
 ## Cost Breakdown
 
 | Resource | Monthly Cost |
 |----------|--------------|
-| Container Apps (2 replicas baseline) | $64.80 |
-| Container Registry (Premium) | $40 |
+| Container Apps (2 replicas, 0.25 vCPU, 0.5 GiB each) | ~$24 |
+| Container Registry (Basic) | ~$5 |
 | Application Insights (90-day retention) | ~$2 |
-| Log Analytics (Store logs for 30 days) | $1 |
-| Storage Account | $5 |
-| **Total** | **~$113/month** |
+| Log Analytics (30-day retention) | ~$1 |
+| Storage Account (Terraform state) | ~$2 |
+| **Total** | **~$34/month** |
 
-**At peak load (5 replicas):** ~$182/month
+**At peak load (5 replicas):** ~$55/month
 
-We track this with Infracost, which estimates cost impact of every infrastructure change before it's deployed. Application Insights is minimal cost (~$2/month) for a low-volume demo app but provides high-value distributed tracing and alerting.
+We track this with Infracost, which estimates cost impact of every infrastructure change before it's deployed.
 
-## Scaling and Future Expansion
+## Common Operations
 
-### Right Now (This Demo)
-- 2-5 replicas (autoscales on HTTP request load)
-- Single region (UK South)
-- Public endpoint
-
-### Next Phase (If We Add Data/Users)
-1. **Custom domain**: Add your own domain + managed certificate
-2. **Multi-region**: Replicate to another Azure region for HA
-3. **Cost optimization**: Reserved instances (20-30% discount for predictable workloads), scheduled scale-down during off-hours
-4. **Advanced observability**: Application Insights, automated alerting, custom dashboards
-
-### Production Hardening (If We Handle Customer Data)
-1. **Network isolation**: VNet with private subnets, private endpoints for ACR and storage
-2. **DDoS/WAF**: Azure Front Door with Web Application Firewall (~$500/month)
-3. **Access control**: NSGs on subnets to prevent lateral movement
-4. **Image trust**: Container Registry content trust (cryptographic signing)
-5. **Secrets management**: Key Vault for runtime secrets (API keys, etc.)
-6. **Compliance scanning**: Policy enforcement, audit logging
-
-## Useful Commands
-
-### View Container App Logs
+**View logs:**
 ```bash
-az containerapp logs show \
-  --name ca-helloworld-prod-uks-001 \
-  --resource-group rg-helloworld-prod-uks-001 \
-  --tail 100
+az containerapp logs show --name ca-hw-prod-uks-001 --resource-group rg-helloworld-prod-uks-001 --tail 100
 ```
 
-### Check Scaling Events
+**Test the app:**
 ```bash
-az containerapp revision list \
-  --name ca-helloworld-prod-uks-001 \
-  --resource-group rg-helloworld-prod-uks-001 \
-  --output table
+FQDN=$(az containerapp show --name ca-hw-prod-uks-001 --resource-group rg-helloworld-prod-uks-001 --query 'properties.configuration.ingress.fqdn' -o tsv)
+curl https://$FQDN/
 ```
 
-### View Infrastructure Costs (Actual)
+**Check replica count & scaling:**
 ```bash
-az costmanagement query \
-  --scope "/subscriptions/$(az account show --query id -o tsv)" \
-  --timeframe "MonthToDate" \
-  --granularity "Daily" \
-  --metrics "ActualCost"
+az containerapp show --name ca-hw-prod-uks-001 --resource-group rg-helloworld-prod-uks-001 --query "properties.template.scale"
 ```
-
-## Security Notes
-
-**What's protected:**
-- HTTPS only (TLS 1.2+)
-- Managed identity auth (no password/key sprawl)
-- Entra ID RBAC (fine-grained permissions)
-- No secrets in GitHub (OIDC federated auth)
-- Image vulnerability scanning (Snyk)
-- Health checks (containers restart on failure)
-
-**What's not (and why):**
-- No WAF: Not needed for a stateless public demo with no data
-- No private network: Everything is intentionally public
-- No IP restrictions: Demo should be accessible
-- ACR is public: Images are public containers anyway
-
-This is appropriate for a demo. Production data would require the hardening mentioned above.
 
 ## Contributing
 
