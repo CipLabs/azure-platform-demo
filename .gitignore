@@ -50,6 +50,14 @@ terraform.rc
 # Uncomment the line below if you want to ignore planout files.
 # planout
 
-# Documentation (not part of infrastructure codebase)
-README.md
-QUICKSTART.md
+# Interview and planning documentation (local only)
+AUTOSCALING_GUIDE.md
+DEPLOYMENT.md
+HLD-PRODUCTION-HARDENING.md
+INTERVIEW-INDEX.md
+INTERVIEW-NARRATIVE.md
+INTERVIEW-QUICK-REF.md
+INTERVIEW-READY.md
+FQDN-FIX.md
+STATUS.md
+

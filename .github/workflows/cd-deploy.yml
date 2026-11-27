@@ -19,9 +19,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     environment: production
     env:
       ARM_USE_OIDC: "true"
@@ -47,10 +47,21 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build image in Azure Container Registry
-        run: az acr build --registry "$ACR_NAME" --image "helloworld:${GITHUB_SHA}" app
+      - name: Build and push image to Azure Container Registry
+        run: |
+          az acr login --name "$ACR_NAME"
+          docker build --tag "$ACR_NAME.azurecr.io/helloworld:${{ github.sha }}" app
+          docker push "$ACR_NAME.azurecr.io/helloworld:${{ github.sha }}"
         env:
           ACR_NAME: ${{ vars.ACR_NAME }}
+
+      - name: Scan image for vulnerabilities
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ vars.ACR_NAME }}.azurecr.io/helloworld:${{ github.sha }}
+          args: --severity-threshold=critical
 
       - name: Initialize remote backend
         run: |
@@ -82,6 +93,92 @@ jobs:
             -var="image_tag=${GITHUB_SHA}"
         env:
           ACR_NAME: ${{ vars.ACR_NAME }}
+
+      - name: Run Infracost cost estimation
+        uses: infracost/actions/setup@v2
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost cost report
+        run: |
+          infracost breakdown --path terraform/workloads/helloworld/tfplan \
+            --format json \
+            --out-file infracost.json
+
+      - name: Display Infracost cost estimate in logs
+        run: |
+          infracost breakdown --path terraform/workloads/helloworld/tfplan \
+            --format table
+
+      - name: Add Infracost to GitHub Actions summary
+        run: |
+          echo "## Infrastructure Cost (Before Apply)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          infracost breakdown --path terraform/workloads/helloworld/tfplan \
+            --format table >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Infracost report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: infracost-report-${{ github.sha }}
+          path: infracost.json
+          retention-days: 30
+
+      - name: Upload terraform plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.sha }}
+          path: terraform/workloads/helloworld/tfplan
+          retention-days: 1
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      TF_IN_AUTOMATION: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_wrapper: false
+
+      - name: Download terraform plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ github.sha }}
+          path: terraform/workloads/helloworld/
+
+      - name: Sign in to Azure with GitHub OIDC
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Initialize remote backend
+        run: |
+          terraform -chdir=terraform/workloads/helloworld init \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=helloworld-prod.tfstate" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true" \
+            -backend-config="client_id=${{ vars.AZURE_CLIENT_ID }}" \
+            -backend-config="tenant_id=${{ vars.AZURE_TENANT_ID }}" \
+            -backend-config="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}"
+        shell: bash
 
       - name: Apply reviewed plan
         run: terraform -chdir=terraform/workloads/helloworld apply -input=false -auto-approve tfplan
