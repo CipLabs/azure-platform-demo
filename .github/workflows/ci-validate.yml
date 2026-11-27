@@ -48,12 +48,16 @@ jobs:
 
       - name: Generate Infracost cost report
         run: |
-          terraform -chdir=terraform/workloads/helloworld init -backend=false -input=false
+          terraform -chdir=terraform/workloads/helloworld init \
+            -backend-config="key=dummy" \
+            -backend-config="container_name=dummy" \
+            -backend-config="storage_account_name=dummy" \
+            -backend-config="resource_group_name=dummy" \
+            -input=false
           terraform -chdir=terraform/workloads/helloworld plan \
             -input=false \
             -out=tfplan.json \
-            -json \
-            -backend=false
+            -json
           infracost breakdown --path terraform/workloads/helloworld/tfplan.json \
             --format json \
             --out-file infracost.json
