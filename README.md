@@ -26,10 +26,12 @@ Public Container App (2-5 replicas, autoscaling)
     └─→ Managed Identity (Azure AD auth)
         
 GitHub Actions CI/CD
+    ├─→ Validate (format, syntax, security)
     ├─→ Build & Push Image
     ├─→ Scan Image (Snyk)
-    ├─→ Cost Estimate (Infracost)
-    └─→ Deploy to App via Terraform (requires approval)
+    └─→ Plan & Cost Estimate (Infracost)
+        └─→ Approval Gate
+            └─→ Deploy to App via Terraform
 ```
 ## Design Decisions
 
@@ -257,21 +259,20 @@ The workflow triggers on pushes to `main` with changes to Terraform or the app c
 
 **Validation (automatic, runs on every push):**
 1. Terraform format check
+1. Format check (`terraform fmt -check -recursive`)
 2. Terraform validate (bootstrap + workload)
 3. Build container image
 4. Scan image with Snyk (blocks on CRITICAL CVEs)
-5. Infracost cost estimate (posts on PR)
-6. Plan Terraform changes
 
 **Deployment (approval required):**
 1. Build and push image to ACR
 2. Scan with Snyk
-3. Show cost estimate
+3. Generate Terraform plan with cost estimate (Infracost)
 4. **Wait for approval** (GitHub environment protection rule)
 5. Run `terraform apply` to deploy Container App
 6. Container App redeploys with new image
 
-The approval gate ensures human review of cost impact and infrastructure changes before production apply. This prevents automation accidents and maintains control over infrastructure changes.
+The approval gate ensures human review of cost impact and infrastructure changes before production apply. Infracost generates the cost estimate during the plan phase so the approval team can see the financial impact before proceeding.
 
 ## Observability & Monitoring
 

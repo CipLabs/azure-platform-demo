@@ -4,9 +4,9 @@ locals {
   log_analytics_workspace_name   = "log-hw-prod-uks-001"
 
   tags = {
-    environment = "prod"
-    managed_by  = "terraform"
-    workload    = "helloworld"
+    Environment = "Prod"
+    Service     = "helloworld"
+    ManagedBy   = "terraform"
   }
 }
 
